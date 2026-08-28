@@ -4,6 +4,11 @@ import {ArrowRight, ArrowUpRight, Clock, Layers} from "lucide-react";
 import {Button} from "../../components/ui/Button";
 
 
+/**
+ * Defines the page metadata for the home route.
+ *
+ * @returns The page title and description metadata.
+ */
 export function meta({}: Route.MetaArgs) {
     return [
         {title: "New React Router App"},
@@ -11,6 +16,11 @@ export function meta({}: Route.MetaArgs) {
     ];
 }
 
+/**
+ * Renders the Roomify home page with navigation, a hero section, upload prompt, and project showcase.
+ *
+ * @returns The home page content.
+ */
 export default function Home() {
     return (
         <div className="home">
