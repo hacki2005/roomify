@@ -98,15 +98,6 @@ interface CardProps {
     action?: React.ReactNode;
 }
 
-type AuthContext = {
-    isSignedIn: boolean;
-    userName: string | null;
-    userId: string | null;
-    refreshAuth: () => Promise<boolean>;
-    signIn: () => Promise<boolean>;
-    signOut: () => Promise<boolean>;
-};
-
 type AuthRequiredModalProps = {
     isOpen: boolean;
     onConfirm: () => void;

@@ -1,9 +1,22 @@
+import {useEffect, useState} from "react";
 import {useLocation} from "react-router";
+import type {Route} from "./+types/visualizer.$id";
+import {getProject} from "../../lib/puter.action";
 
 
-const VisualizerId = () => {
+const VisualizerId = ({params}: Route.ComponentProps) => {
     const location = useLocation();
-    const {initialImage,name} = location.state || {};
+    const navigationState = location.state as VisualizerLocationState | null;
+    const [project, setProject] = useState<DesignItem | null>(null);
+
+    useEffect(() => {
+        if (navigationState) return;
+
+        getProject(params.id).then(setProject);
+    }, [navigationState, params.id]);
+
+    const initialImage = navigationState?.initialImage ?? project?.sourceImage;
+    const name = navigationState?.name ?? project?.name;
 
     return (
         <section>

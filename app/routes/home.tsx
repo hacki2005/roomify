@@ -51,6 +51,7 @@ export default function Home() {
         initialImage: saved.sourceImage,
         initialRendered: saved.renderedImage || null,
 
+        name: saved.name,
 
       }
     });
