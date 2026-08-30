@@ -7,6 +7,11 @@ import { useNavigate } from "react-router";
 import {useState} from "react";
 import {createProject} from "../../lib/puter.action";
 
+/**
+ * Defines the page metadata for the application.
+ *
+ * @returns The page title and description metadata.
+ */
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "New React Router App" },
@@ -14,6 +19,11 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
+/**
+ * Renders the Roomify landing page with floor-plan upload and project listing sections.
+ *
+ * @returns The rendered landing page.
+ */
 export default function Home() {
   
   const navigate = useNavigate();
