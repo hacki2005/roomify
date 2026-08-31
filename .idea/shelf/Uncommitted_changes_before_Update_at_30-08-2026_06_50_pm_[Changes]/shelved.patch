@@ -1,0 +1,896 @@
+Index: app/routes/visualizer.$id.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import { useLocation, useParams } from \"react-router\";\r\nimport { createProject, getProjectById } from \"../../lib/puter.action\";\r\n\r\nconst VisualizerId = () => {\r\n  const location = useLocation();\r\n  const { id } = useParams();\r\n  const state = location.state as {\r\n    initialImage?: string;\r\n    initialRendered?: string | null;\r\n    name?: string | null;\r\n  } | null;\r\n  const initialImage = state?.initialImage ?? null;\r\n  const name = state?.name ?? null;\r\n  const resolvedProject = id ? getProjectById(id) : null;\r\n  const projectName = name ?? resolvedProject?.name ?? \"Untitled project\";\r\n  const projectImage = initialImage ?? resolvedProject?.sourceImage ?? null;\r\n\r\n  return (\r\n    <section>\r\n      <h1>{projectName}</h1>\r\n\r\n      <div className=\"image-container\">\r\n        <h2>Source Image</h2>\r\n        <img src={projectImage || undefined} alt=\"source\" />\r\n      </div>\r\n    </section>\r\n  );\r\n};\r\nexport default VisualizerId;\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/routes/visualizer.$id.tsx b/app/routes/visualizer.$id.tsx
+--- a/app/routes/visualizer.$id.tsx	(revision b301551c7af11996bb89697daeb5979ee66318a1)
++++ b/app/routes/visualizer.$id.tsx	(date 1788095822602)
+@@ -1,29 +1,32 @@
+-import { useLocation, useParams } from "react-router";
+-import { createProject, getProjectById } from "../../lib/puter.action";
++import {useEffect, useState} from "react";
++import {useLocation} from "react-router";
++import type {Route} from "./+types/visualizer.$id";
++import {getProject} from "../../lib/puter.action";
+ 
+-const VisualizerId = () => {
+-  const location = useLocation();
+-  const { id } = useParams();
+-  const state = location.state as {
+-    initialImage?: string;
+-    initialRendered?: string | null;
+-    name?: string | null;
+-  } | null;
+-  const initialImage = state?.initialImage ?? null;
+-  const name = state?.name ?? null;
+-  const resolvedProject = id ? getProjectById(id) : null;
+-  const projectName = name ?? resolvedProject?.name ?? "Untitled project";
+-  const projectImage = initialImage ?? resolvedProject?.sourceImage ?? null;
++
++const VisualizerId = ({params}: Route.ComponentProps) => {
++    const location = useLocation();
++    const navigationState = location.state as VisualizerLocationState | null;
++    const [project, setProject] = useState<DesignItem | null>(null);
++
++    useEffect(() => {
++        if (navigationState) return;
++
++        getProject(params.id).then(setProject);
++    }, [navigationState, params.id]);
++
++    const initialImage = navigationState?.initialImage ?? project?.sourceImage;
++    const name = navigationState?.name ?? project?.name;
+ 
+-  return (
+-    <section>
+-      <h1>{projectName}</h1>
++    return (
++        <section>
++            <h1>{name || 'Untitled project'}</h1>
+ 
+-      <div className="image-container">
+-        <h2>Source Image</h2>
+-        <img src={projectImage || undefined} alt="source" />
+-      </div>
+-    </section>
+-  );
+-};
+-export default VisualizerId;
++            <div className="image-container">
++                <h2>Source Image</h2>
++                <img src={initialImage} alt="source"/>
++            </div>
++        </section>
++    )
++}
++export default VisualizerId
+Index: lib/puter.action.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import puter from \"@heyputer/puter.js\";\r\nimport {\r\n  getOrCreateHostingConfig,\r\n  uploadImageToHosting,\r\n} from \"./puter.hosting\";\r\nimport { isHostedUrl } from \"./utils\";\r\n\r\nexport const signIn = async () => await puter.auth.signIn();\r\n\r\nexport const signOut = () => puter.auth.signOut();\r\n\r\nexport const getCurrentUser = async () => {\r\n  try {\r\n    return await puter.auth.getUser();\r\n  } catch {\r\n    return null;\r\n  }\r\n};\r\n\r\nexport const createProject = async ({\r\n  item,\r\n}: CreateProjectParams): Promise<DesignItem | null | undefined> => {\r\n  const projectId = item.id;\r\n  const hosting = await getOrCreateHostingConfig();\r\n\r\n  const hostedSource = projectId\r\n    ? await uploadImageToHosting({\r\n        hosting,\r\n        url: item.sourceImage,\r\n        projectId,\r\n        label: \"source\",\r\n      })\r\n    : null;\r\n\r\n  const hostedRender =\r\n    projectId && item.renderedImage\r\n      ? await uploadImageToHosting({\r\n          hosting,\r\n          url: item.renderedImage,\r\n          projectId,\r\n          label: \"rendered\",\r\n        })\r\n      : null;\r\n  const resolvedSource =\r\n    hostedSource?.url ||\r\n    (isHostedUrl(item.sourceImage) ? item.sourceImage : \"\");\r\n\r\n  if (!resolvedSource) {\r\n    console.warn(`Failed to host source image, skipping save.`);\r\n    return null;\r\n  }\r\n\r\n  const resolvedRender = hostedRender?.url\r\n    ? hostedRender?.url\r\n    : item.renderedImage && isHostedUrl(item.renderedImage)\r\n      ? item.renderedImage\r\n      : undefined;\r\n  const {\r\n    sourcePath: _sourcePath,\r\n    renderedPath: _renderedPath,\r\n    publicPath: _publicPath,\r\n    ...rest\r\n  } = item;\r\n  const payload = {\r\n    ...rest,\r\n    sourceImage: resolvedSource,\r\n    renderedImage: resolvedRender,\r\n  };\r\n  try {\r\n    await puter.kv.set(projectId, payload);\r\n    return payload;\r\n  } catch (e) {\r\n    console.log(\"Failed to save project\", e);\r\n    return null;\r\n  }\r\n};\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/lib/puter.action.ts b/lib/puter.action.ts
+--- a/lib/puter.action.ts	(revision b301551c7af11996bb89697daeb5979ee66318a1)
++++ b/lib/puter.action.ts	(date 1788095807870)
+@@ -1,76 +1,67 @@
+-import puter from "@heyputer/puter.js";
+-import {
+-  getOrCreateHostingConfig,
+-  uploadImageToHosting,
+-} from "./puter.hosting";
+-import { isHostedUrl } from "./utils";
++import puter from "@heyputer/puter.js"
++import {getOrCreateHostingConfig, uploadImageToHosting} from "./puter.hosting";
++import {isHostedUrl} from "./utils";
+ 
+ export const signIn = async () => await puter.auth.signIn();
+ 
+ export const signOut = () => puter.auth.signOut();
+ 
++
+ export const getCurrentUser = async () => {
+-  try {
+-    return await puter.auth.getUser();
+-  } catch {
+-    return null;
+-  }
+-};
++    try {
++        return await puter.auth.getUser();
++    } catch {
++        return null;
++    }
++}
+ 
+-export const createProject = async ({
+-  item,
+-}: CreateProjectParams): Promise<DesignItem | null | undefined> => {
+-  const projectId = item.id;
+-  const hosting = await getOrCreateHostingConfig();
++export const createProject = async ({item}: CreateProjectParams):
++    Promise<DesignItem | null | undefined> => {
++    const projectId = item.id;
++    const hosting = await getOrCreateHostingConfig()
+ 
+-  const hostedSource = projectId
+-    ? await uploadImageToHosting({
+-        hosting,
+-        url: item.sourceImage,
+-        projectId,
+-        label: "source",
+-      })
+-    : null;
++    const hostedSource = projectId ?
++        await uploadImageToHosting({
++            hosting, url: item.sourceImage, projectId, label: 'source',
++        }) : null;
+ 
+-  const hostedRender =
+-    projectId && item.renderedImage
+-      ? await uploadImageToHosting({
+-          hosting,
+-          url: item.renderedImage,
+-          projectId,
+-          label: "rendered",
+-        })
+-      : null;
+-  const resolvedSource =
+-    hostedSource?.url ||
+-    (isHostedUrl(item.sourceImage) ? item.sourceImage : "");
++    const hostedRender = projectId && item.renderedImage ?
++        await uploadImageToHosting({
++            hosting, url: item.renderedImage, projectId, label: 'rendered',
++        }) : null
++    const resolvedSource = hostedSource?.url || (isHostedUrl(item.sourceImage)
++            ? item.sourceImage
++            : ''
++    );
+ 
+-  if (!resolvedSource) {
+-    console.warn(`Failed to host source image, skipping save.`);
+-    return null;
+-  }
++    if (!resolvedSource) {
++        console.warn(`Failed to host source image, skipping save.`)
++        return null;
++    }
+ 
+-  const resolvedRender = hostedRender?.url
+-    ? hostedRender?.url
+-    : item.renderedImage && isHostedUrl(item.renderedImage)
+-      ? item.renderedImage
+-      : undefined;
+-  const {
+-    sourcePath: _sourcePath,
+-    renderedPath: _renderedPath,
+-    publicPath: _publicPath,
+-    ...rest
+-  } = item;
+-  const payload = {
+-    ...rest,
+-    sourceImage: resolvedSource,
+-    renderedImage: resolvedRender,
+-  };
+-  try {
+-    await puter.kv.set(projectId, payload);
+-    return payload;
+-  } catch (e) {
+-    console.log("Failed to save project", e);
+-    return null;
+-  }
+-};
++    const resolvedRender = hostedRender ?.url
++        ? hostedRender?.url
++        :item.renderedImage && isHostedUrl(item.renderedImage)
++        ? item.renderedImage : undefined;
++    const {
++        sourcePath: _sourcePath,
++        renderedPath:_renderedPath,
++        publicPath : _publicPath,
++        ...rest
++    } = item;
++    const payload = {
++        ...rest,
++        sourceImage: resolvedSource,
++        renderedImage:resolvedRender,
++
++
++    }
++    try {
++        // Call the Puter worker to store project in kv
++
++        return payload
++    }catch (e){
++        console.log('Failed to save project',e)
++        return null;
++    }
++}
+\ No newline at end of file
+Index: app/routes/home.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import type { Route } from \"./+types/home\";\r\nimport Navbar from \"../../components/Navbar\";\r\nimport { ArrowRight, ArrowUpRight, Clock, Layers } from \"lucide-react\";\r\nimport { Button } from \"../../components/ui/Button\";\r\nimport Upload from \"../../components/Upload\";\r\nimport { useNavigate } from \"react-router\";\r\nimport { useState } from \"react\";\r\nimport { createProject } from \"../../lib/puter.action\";\r\n\r\nexport function meta({}: Route.MetaArgs) {\r\n  return [\r\n    { title: \"New React Router App\" },\r\n    { name: \"description\", content: \"Welcome to React Router!\" },\r\n  ];\r\n}\r\n\r\nexport default function Home() {\r\n  const navigate = useNavigate();\r\n  const [projects, setProjects] = useState<DesignItem[]>([]);\r\n  const handleUploadComplete = async (base64Image: string) => {\r\n    const newId = Date.now().toString();\r\n    const name = `Residence ${newId}`;\r\n    const newItem = {\r\n      id: newId,\r\n      name,\r\n      sourceImage: base64Image,\r\n      renderedImage: undefined,\r\n      timestamp: Date.now(),\r\n    };\r\n    const saved = await createProject({\r\n      item: newItem,\r\n      visibility: \"private\",\r\n    });\r\n\r\n    if (!saved) {\r\n      console.error(\"Failed to create project\");\r\n      return false;\r\n    }\r\n    setProjects((prev) => [newItem, ...prev]);\r\n\r\n    navigate(`/visualizer/${newId}`, {\r\n      state: {\r\n        initialImage: saved.sourceImage,\r\n        initialRendered: saved.renderedImage || null,\r\n        name: saved.name,\r\n      },\r\n    });\r\n\r\n    return true;\r\n  };\r\n  return (\r\n    <div className=\"home\">\r\n      <Navbar />\r\n\r\n      <section className=\"hero\">\r\n        <div className=\"announce\">\r\n          <div className=\"dot\">\r\n            <div className=\"pulse\"></div>\r\n          </div>\r\n          <p>Introducing Roomify 2.0</p>\r\n        </div>\r\n        <h1>Build beautiful spaces at the speed of thought with Roomify</h1>\r\n        <p className=\"subtitle\">\r\n          Roomify is an Ai-first design environment that helps you\r\n          visualize,render, and ship architectural projects faster than ever.\r\n        </p>\r\n        <div className=\"actions\">\r\n          <a href=\"#upload\" className=\"cta\">\r\n            Start building <ArrowRight className=\"icon\" />\r\n          </a>\r\n          <Button variant=\"outline\" size=\"lg\" className=\"demo\">\r\n            Watch Demo\r\n          </Button>\r\n        </div>\r\n        <div id=\"upload\" className=\"upload-shell\">\r\n          <div className=\"grid-overlay\" />\r\n          <div className=\"upload-card\">\r\n            <div className=\"upload-icon\">\r\n              <Layers className=\"icon\" />\r\n            </div>\r\n\r\n            <h3>Upload your floor plan</h3>\r\n            <p>Supports JPG, PNG formats up to 10MB</p>\r\n\r\n            <Upload onComplete={handleUploadComplete} />\r\n          </div>\r\n        </div>\r\n      </section>\r\n      <section className=\"projects\">\r\n        <div className=\"section-inner\">\r\n          <div className=\"section-head\">\r\n            <div className=\"copy\">\r\n              <h2>projects</h2>\r\n              <p>\r\n                Your latest work and shared community projects, all in one\r\n                place.\r\n              </p>\r\n            </div>\r\n          </div>\r\n          <div className=\"projects-grid\">\r\n            {projects.map(\r\n              ({ id, name, renderedImage, sourceImage, timestamp }) => (\r\n                <div className=\"project-card group\">\r\n                  <div className=\"preview\">\r\n                    <img\r\n                      src={renderedImage || sourceImage}\r\n                      alt=\"project-preview\"\r\n                    />\r\n                    <div className=\"badge\">\r\n                      <span>Community</span>\r\n                    </div>\r\n                  </div>\r\n                  <div className=\"card-body\">\r\n                    <div>\r\n                      <h3>{name}</h3>\r\n                      <div className=\"meta\">\r\n                        <Clock size={12} />\r\n                        <span>\r\n                          {new Date(timestamp).toLocaleDateString(\"en-US\", {\r\n                            year: \"numeric\",\r\n                            month: \"2-digit\",\r\n                            day: \"2-digit\",\r\n                          })}\r\n                        </span>\r\n                        <span>By Hari</span>\r\n                      </div>\r\n                    </div>\r\n                    <div className=\"arrow\">\r\n                      <ArrowUpRight size=\"18\" />\r\n                    </div>\r\n                  </div>\r\n                </div>\r\n              ),\r\n            )}\r\n          </div>\r\n        </div>\r\n      </section>\r\n    </div>\r\n  );\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/routes/home.tsx b/app/routes/home.tsx
+--- a/app/routes/home.tsx	(revision b301551c7af11996bb89697daeb5979ee66318a1)
++++ b/app/routes/home.tsx	(date 1788095820259)
+@@ -4,9 +4,14 @@
+ import { Button } from "../../components/ui/Button";
+ import Upload from "../../components/Upload";
+ import { useNavigate } from "react-router";
+-import { useState } from "react";
+-import { createProject } from "../../lib/puter.action";
++import {useState} from "react";
++import {createProject} from "../../lib/puter.action";
+ 
++/**
++ * Defines the page metadata for the application.
++ *
++ * @returns The page title and description metadata.
++ */
+ export function meta({}: Route.MetaArgs) {
+   return [
+     { title: "New React Router App" },
+@@ -14,36 +19,41 @@
+   ];
+ }
+ 
++/**
++ * Renders the Roomify landing page with floor-plan upload and project listing sections.
++ *
++ * @returns The rendered landing page.
++ */
+ export default function Home() {
++  
+   const navigate = useNavigate();
+   const [projects, setProjects] = useState<DesignItem[]>([]);
+   const handleUploadComplete = async (base64Image: string) => {
+     const newId = Date.now().toString();
+-    const name = `Residence ${newId}`;
++    const name = `Residence ${newId}`
+     const newItem = {
+-      id: newId,
+-      name,
+-      sourceImage: base64Image,
+-      renderedImage: undefined,
+-      timestamp: Date.now(),
+-    };
++      id:newId,name,sourceImage:base64Image,renderedImage: undefined,
++      timestamp:Date.now()
++    }
+     const saved = await createProject({
+-      item: newItem,
+-      visibility: "private",
++      item:newItem,visibility:'private'
+     });
+ 
+-    if (!saved) {
+-      console.error("Failed to create project");
++    if(!saved){
++      console.error("Failed to create project")
+       return false;
+     }
+     setProjects((prev) => [newItem, ...prev]);
+ 
+-    navigate(`/visualizer/${newId}`, {
+-      state: {
++
++    navigate(`/visualizer/${newId}`,{
++      state:{
+         initialImage: saved.sourceImage,
+         initialRendered: saved.renderedImage || null,
++
+         name: saved.name,
+-      },
++
++      }
+     });
+ 
+     return true;
+@@ -98,40 +108,40 @@
+             </div>
+           </div>
+           <div className="projects-grid">
+-            {projects.map(
+-              ({ id, name, renderedImage, sourceImage, timestamp }) => (
+-                <div className="project-card group">
+-                  <div className="preview">
+-                    <img
+-                      src={renderedImage || sourceImage}
+-                      alt="project-preview"
+-                    />
+-                    <div className="badge">
+-                      <span>Community</span>
+-                    </div>
+-                  </div>
+-                  <div className="card-body">
+-                    <div>
+-                      <h3>{name}</h3>
+-                      <div className="meta">
+-                        <Clock size={12} />
+-                        <span>
+-                          {new Date(timestamp).toLocaleDateString("en-US", {
+-                            year: "numeric",
+-                            month: "2-digit",
+-                            day: "2-digit",
+-                          })}
+-                        </span>
+-                        <span>By Hari</span>
+-                      </div>
+-                    </div>
+-                    <div className="arrow">
+-                      <ArrowUpRight size="18" />
+-                    </div>
+-                  </div>
+-                </div>
+-              ),
+-            )}
++            {projects.map(({id,name, renderedImage, sourceImage,
++            timestamp})=>(
++              <div className="project-card group">
++              <div className="preview">
++              <img
++              src={renderedImage || sourceImage}
++              alt="project-preview"
++              />
++              <div className="badge">
++              <span>Community</span>
++              </div>
++              </div>
++              <div className="card-body">
++              <div>
++              <h3>{name}</h3>
++              <div className="meta">
++              <Clock size={12} />
++          <span>
++                      {new Date(timestamp).toLocaleDateString("en-US", {
++                        year: "numeric",
++                        month: "2-digit",
++                        day: "2-digit",
++                      })}
++                    </span>
++          <span>By Hari</span>
++        </div>
++    </div>
++  <div className="arrow">
++    <ArrowUpRight size="18" />
++  </div>
++</div>
++</div>
++            ))}
++
+           </div>
+         </div>
+       </section>
+Index: lib/puter.hosting.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import puter, {type Hosting} from \"@heyputer/puter.js\";\r\nimport {\r\n    createHostingSlug,\r\n    fetchBlobFromUrl,\r\n    getHostedUrl,\r\n    getImageExtension,\r\n    HOSTING_CONFIG_KEY,\r\n    imageUrlToPngBlob,\r\n    isHostedUrl,\r\n} from \"./utils\";\r\n\r\nexport const getOrCreateHostingConfig =\r\n    async (): Promise<HostingConfig | null> => {\r\n        const existing = (await puter.kv.get(\r\n            HOSTING_CONFIG_KEY,\r\n        )) as HostingConfig | null;\r\n\r\n        if (existing?.subdomain) return {subdomain: existing.subdomain};\r\n\r\n        const subdomain = createHostingSlug();\r\n\r\n        try {\r\n            const created = await puter.hosting.create(subdomain, \".\");\r\n            await puter.kv.set(HOSTING_CONFIG_KEY, {subdomain: created.subdomain});\r\n            const record =  {subdomain: created.subdomain};\r\n            await puter.kv.set(HOSTING_CONFIG_KEY,record)\r\n            return  record;\r\n        } catch (e) {\r\n            console.warn(`Could not find subdomain: ${e}`);\r\n            return null;\r\n        }\r\n    };\r\n\r\nexport const uploadImageToHosting = async ({\r\n                                               hosting,\r\n                                               url,\r\n                                               projectId,\r\n                                               label,\r\n                                           }: StoreHostedImageParams): Promise<HostedAsset | null> => {\r\n    if (!hosting || !url) return null;\r\n    if (isHostedUrl(url)) return {url};\r\n\r\n    try {\r\n        const resolved =\r\n            label === \"rendered\"\r\n                ? await imageUrlToPngBlob(url).then((blob) =>\r\n                    blob ? {blob, contentType: \"image/png\"} : null,\r\n                )\r\n                : await fetchBlobFromUrl(url);\r\n\r\n        if (!resolved) return null;\r\n\r\n        const contentType = resolved.contentType || resolved.blob.type || \"\";\r\n\r\n        const ext = getImageExtension(contentType, url);\r\n\r\n        const dir = `project/${projectId}`;\r\n        const filePath = `${dir}/${label}.${ext}`;\r\n\r\n        const uploadFile = new File([resolved.blob], `${label}.${ext}`, {\r\n            type: contentType,\r\n        });\r\n        await puter.fs.mkdir(dir, {createMissingParents: true});\r\n        await puter.fs.write(filePath, uploadFile);\r\n\r\n        const hostedUrl = getHostedUrl({subdomain: hosting.subdomain}, filePath);\r\n\r\n        return hostedUrl ? {url: hostedUrl} : null;\r\n    } catch (e) {\r\n        console.log(`Failed to store hosted image: ${e}`);\r\n        return null;\r\n    }\r\n};\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/lib/puter.hosting.ts b/lib/puter.hosting.ts
+--- a/lib/puter.hosting.ts	(revision b301551c7af11996bb89697daeb5979ee66318a1)
++++ b/lib/puter.hosting.ts	(date 1788095766614)
+@@ -1,73 +1,62 @@
+ import puter, {type Hosting} from "@heyputer/puter.js";
+ import {
+     createHostingSlug,
+-    fetchBlobFromUrl,
+-    getHostedUrl,
++    fetchBlobFromUrl, getHostedUrl,
+     getImageExtension,
+     HOSTING_CONFIG_KEY,
+     imageUrlToPngBlob,
+-    isHostedUrl,
++    isHostedUrl
+ } from "./utils";
+ 
+-export const getOrCreateHostingConfig =
+-    async (): Promise<HostingConfig | null> => {
+-        const existing = (await puter.kv.get(
+-            HOSTING_CONFIG_KEY,
+-        )) as HostingConfig | null;
++
++
++export const getOrCreateHostingConfig = async ():Promise<HostingConfig |  null> => {
++    const existing = (await puter.kv.get(HOSTING_CONFIG_KEY)) as HostingConfig | null;
+ 
+-        if (existing?.subdomain) return {subdomain: existing.subdomain};
++    if(existing?.subdomain) return { subdomain : existing.subdomain};
+ 
+-        const subdomain = createHostingSlug();
++    const subdomain = createHostingSlug();
+ 
+-        try {
+-            const created = await puter.hosting.create(subdomain, ".");
+-            await puter.kv.set(HOSTING_CONFIG_KEY, {subdomain: created.subdomain});
+-            const record =  {subdomain: created.subdomain};
+-            await puter.kv.set(HOSTING_CONFIG_KEY,record)
+-            return  record;
+-        } catch (e) {
+-            console.warn(`Could not find subdomain: ${e}`);
+-            return null;
+-        }
+-    };
++    try {
++        const created = await puter.hosting.create(subdomain,'.')
++         return { subdomain:created.subdomain};
++
++
++    }catch (e){
++        console.warn(`Could not find subdomain: ${e}`);
++        return null
++    }
++}
+ 
+-export const uploadImageToHosting = async ({
+-                                               hosting,
+-                                               url,
+-                                               projectId,
+-                                               label,
+-                                           }: StoreHostedImageParams): Promise<HostedAsset | null> => {
++export const uploadImageToHosting = async ({ hosting,url,projectId,label}:StoreHostedImageParams): Promise<HostedAsset | null> =>{
+     if (!hosting || !url) return null;
+     if (isHostedUrl(url)) return {url};
+ 
+     try {
+-        const resolved =
+-            label === "rendered"
+-                ? await imageUrlToPngBlob(url).then((blob) =>
+-                    blob ? {blob, contentType: "image/png"} : null,
+-                )
+-                : await fetchBlobFromUrl(url);
++        const  resolved = label ===
++        "rendered" ? await  imageUrlToPngBlob(url).then((blob)=> blob ? {blob,
++        contentType:'image/png'}:null) : await fetchBlobFromUrl(url);
+ 
+-        if (!resolved) return null;
++        if(!resolved) return null
+ 
+-        const contentType = resolved.contentType || resolved.blob.type || "";
++        const contentType = resolved.contentType || resolved.blob.type || '';
+ 
+-        const ext = getImageExtension(contentType, url);
++        const ext = getImageExtension(contentType,url)
+ 
+         const dir = `project/${projectId}`;
+-        const filePath = `${dir}/${label}.${ext}`;
++        const filePath =  `${dir}/${label}.${ext}`
+ 
+-        const uploadFile = new File([resolved.blob], `${label}.${ext}`, {
+-            type: contentType,
++        const uploadFile = new File([resolved.blob],`${label}.${ext}`,{
++            type:contentType,
+         });
+-        await puter.fs.mkdir(dir, {createMissingParents: true});
+-        await puter.fs.write(filePath, uploadFile);
++        await puter.fs.mkdir(dir, {createMissingParents: true})
++        await puter.fs.write(filePath,uploadFile)
+ 
+-        const hostedUrl = getHostedUrl({subdomain: hosting.subdomain}, filePath);
++        const hostedUrl = getHostedUrl({subdomain:hosting.subdomain},filePath)
+ 
+-        return hostedUrl ? {url: hostedUrl} : null;
+-    } catch (e) {
++        return hostedUrl ? {url :hostedUrl}:null
++    }catch (e){
+         console.log(`Failed to store hosted image: ${e}`);
+         return null;
+     }
+-};
++}
+\ No newline at end of file
+Index: type.d.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>interface AuthState {\r\n  isSignedIn: boolean;\r\n  userName: string | null;\r\n  userId: string | null;\r\n}\r\n\r\ninterface AuthContext extends AuthState {\r\n  refreshAuth: () => Promise<boolean>;\r\n  signIn: () => Promise<boolean>;\r\n  signOut: () => Promise<boolean>;\r\n}\r\ninterface AuthState {\r\n  isSignedIn: boolean;\r\n  userName: string | null;\r\n  userId: string | null;\r\n}\r\n\r\ninterface Material {\r\n  id: string;\r\n  name: string;\r\n  thumbnail: string;\r\n  type: \"color\" | \"texture\";\r\n  category: \"floor\" | \"wall\" | \"furniture\";\r\n}\r\n\r\ninterface DesignItem {\r\n  id: string;\r\n  name?: string | null;\r\n  sourceImage: string;\r\n  sourcePath?: string | null;\r\n  renderedImage?: string | null;\r\n  renderedPath?: string | null;\r\n  publicPath?: string | null;\r\n  timestamp: number;\r\n  ownerId?: string | null;\r\n  sharedBy?: string | null;\r\n  sharedAt?: string | null;\r\n  isPublic?: boolean;\r\n}\r\n\r\ninterface DesignConfig {\r\n  floor: string;\r\n  walls: string;\r\n  style: string;\r\n}\r\n\r\nenum AppStatus {\r\n  IDLE = \"IDLE\",\r\n  UPLOADING = \"UPLOADING\",\r\n  PROCESSING = \"PROCESSING\",\r\n  READY = \"READY\",\r\n}\r\n\r\ntype RenderCompletePayload = {\r\n  renderedImage: string;\r\n  renderedPath?: string;\r\n};\r\n\r\ntype VisualizerLocationState = {\r\n  initialImage?: string;\r\n  initialRender?: string | null;\r\n  ownerId?: string | null;\r\n  name?: string | null;\r\n  sharedBy?: string | null;\r\n};\r\n\r\ninterface VisualizerProps {\r\n  onBack: () => void;\r\n  initialImage: string | null;\r\n  onRenderComplete?: (payload: RenderCompletePayload) => void;\r\n  onShare?: (image: string) => Promise<void> | void;\r\n  onUnshare?: (image: string) => Promise<void> | void;\r\n  projectName?: string;\r\n  projectId?: string;\r\n  initialRender?: string | null;\r\n  isPublic?: boolean;\r\n  sharedBy?: string | null;\r\n  canUnshare?: boolean;\r\n}\r\n\r\ninterface UploadProps {\r\n  onComplete: (base64File: string) => Promise<boolean | void> | boolean | void;\r\n  className?: string;\r\n}\r\n\r\ninterface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {\r\n  variant?: \"primary\" | \"secondary\" | \"ghost\" | \"outline\";\r\n  size?: \"sm\" | \"md\" | \"lg\";\r\n  fullWidth?: boolean;\r\n}\r\n\r\ninterface CardProps {\r\n  children: React.ReactNode;\r\n  className?: string;\r\n  title?: string;\r\n  action?: React.ReactNode;\r\n}\r\n\r\ntype AuthRequiredModalProps = {\r\n  isOpen: boolean;\r\n  onConfirm: () => void;\r\n  onCancel: () => void;\r\n  title?: string;\r\n  description?: string;\r\n  confirmLabel?: string;\r\n};\r\n\r\ntype ShareAction = \"share\" | \"unshare\";\r\ntype ShareStatus = \"idle\" | \"saving\" | \"done\";\r\n\r\ntype HostingConfig = { subdomain: string };\r\ntype HostedAsset = { url: string };\r\n\r\ninterface StoreHostedImageParams {\r\n  hosting: HostingConfig | null;\r\n  url: string;\r\n  projectId: string;\r\n  label: \"source\" | \"rendered\";\r\n}\r\n\r\ninterface CreateProjectParams {\r\n  item: DesignItem;\r\n  visibility?: \"private\" | \"public\";\r\n}\r\n\r\ninterface Generate3DViewParams {\r\n  sourceImage: string;\r\n  projectId?: string | null;\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/type.d.ts b/type.d.ts
+--- a/type.d.ts	(revision b301551c7af11996bb89697daeb5979ee66318a1)
++++ b/type.d.ts	(date 1788095821726)
+@@ -1,108 +1,110 @@
+ interface AuthState {
+-  isSignedIn: boolean;
+-  userName: string | null;
+-  userId: string | null;
++    isSignedIn : boolean;
++    userName: string | null,
++    userId : string | null,
+ }
+ 
+-interface AuthContext extends AuthState {
+-  refreshAuth: () => Promise<boolean>;
+-  signIn: () => Promise<boolean>;
+-  signOut: () => Promise<boolean>;
++interface AuthContext  extends AuthState {
++
++    refreshAuth:() => Promise<boolean>;
++    signIn:() => Promise<boolean>;
++    signOut:() => Promise<boolean>;
++
+ }
+ interface AuthState {
+-  isSignedIn: boolean;
+-  userName: string | null;
+-  userId: string | null;
++    isSignedIn: boolean;
++    userName: string | null;
++    userId: string | null;
+ }
+ 
+ interface Material {
+-  id: string;
+-  name: string;
+-  thumbnail: string;
+-  type: "color" | "texture";
+-  category: "floor" | "wall" | "furniture";
++    id: string;
++    name: string;
++    thumbnail: string;
++    type: "color" | "texture";
++    category: "floor" | "wall" | "furniture";
+ }
+ 
+ interface DesignItem {
+-  id: string;
+-  name?: string | null;
+-  sourceImage: string;
+-  sourcePath?: string | null;
+-  renderedImage?: string | null;
+-  renderedPath?: string | null;
+-  publicPath?: string | null;
+-  timestamp: number;
+-  ownerId?: string | null;
+-  sharedBy?: string | null;
+-  sharedAt?: string | null;
+-  isPublic?: boolean;
++    id: string;
++    name?: string | null;
++    sourceImage: string;
++    sourcePath?: string | null;
++    renderedImage?: string | null;
++    renderedPath?: string | null;
++    publicPath?: string | null;
++    timestamp: number;
++    ownerId?: string | null;
++    sharedBy?: string | null;
++    sharedAt?: string | null;
++    isPublic?: boolean;
+ }
+ 
+ interface DesignConfig {
+-  floor: string;
+-  walls: string;
+-  style: string;
++    floor: string;
++    walls: string;
++    style: string;
+ }
+ 
+ enum AppStatus {
+-  IDLE = "IDLE",
+-  UPLOADING = "UPLOADING",
+-  PROCESSING = "PROCESSING",
+-  READY = "READY",
++    IDLE = "IDLE",
++    UPLOADING = "UPLOADING",
++    PROCESSING = "PROCESSING",
++    READY = "READY",
+ }
+ 
+ type RenderCompletePayload = {
+-  renderedImage: string;
+-  renderedPath?: string;
++    renderedImage: string;
++    renderedPath?: string;
+ };
+ 
+ type VisualizerLocationState = {
+-  initialImage?: string;
+-  initialRender?: string | null;
+-  ownerId?: string | null;
+-  name?: string | null;
+-  sharedBy?: string | null;
++    initialImage?: string;
++    initialRender?: string | null;
++    ownerId?: string | null;
++    name?: string | null;
++    sharedBy?: string | null;
+ };
+ 
+ interface VisualizerProps {
+-  onBack: () => void;
+-  initialImage: string | null;
+-  onRenderComplete?: (payload: RenderCompletePayload) => void;
+-  onShare?: (image: string) => Promise<void> | void;
+-  onUnshare?: (image: string) => Promise<void> | void;
+-  projectName?: string;
+-  projectId?: string;
+-  initialRender?: string | null;
+-  isPublic?: boolean;
+-  sharedBy?: string | null;
+-  canUnshare?: boolean;
++    onBack: () => void;
++    initialImage: string | null;
++    onRenderComplete?: (payload: RenderCompletePayload) => void;
++    onShare?: (image: string) => Promise<void> | void;
++    onUnshare?: (image: string) => Promise<void> | void;
++    projectName?: string;
++    projectId?: string;
++    initialRender?: string | null;
++    isPublic?: boolean;
++    sharedBy?: string | null;
++    canUnshare?: boolean;
+ }
+ 
+ interface UploadProps {
+-  onComplete: (base64File: string) => Promise<boolean | void> | boolean | void;
+-  className?: string;
++    onComplete: (base64File: string) => Promise<boolean | void> | boolean | void;
++    className?: string;
+ }
+ 
+ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+-  variant?: "primary" | "secondary" | "ghost" | "outline";
+-  size?: "sm" | "md" | "lg";
+-  fullWidth?: boolean;
++    variant?: "primary" | "secondary" | "ghost" | "outline";
++    size?: "sm" | "md" | "lg";
++    fullWidth?: boolean;
+ }
+ 
+ interface CardProps {
+-  children: React.ReactNode;
+-  className?: string;
+-  title?: string;
+-  action?: React.ReactNode;
++    children: React.ReactNode;
++    className?: string;
++    title?: string;
++    action?: React.ReactNode;
+ }
+ 
+ type AuthRequiredModalProps = {
+-  isOpen: boolean;
+-  onConfirm: () => void;
+-  onCancel: () => void;
+-  title?: string;
+-  description?: string;
+-  confirmLabel?: string;
++    isOpen: boolean;
++    onConfirm: () => void;
++    onCancel: () => void;
++    title?: string;
++    description?: string;
++    confirmLabel?: string;
+ };
+ 
+ type ShareAction = "share" | "unshare";
+@@ -112,18 +114,18 @@
+ type HostedAsset = { url: string };
+ 
+ interface StoreHostedImageParams {
+-  hosting: HostingConfig | null;
+-  url: string;
+-  projectId: string;
+-  label: "source" | "rendered";
++    hosting: HostingConfig | null;
++    url: string;
++    projectId: string;
++    label: "source" | "rendered";
+ }
+ 
+ interface CreateProjectParams {
+-  item: DesignItem;
+-  visibility?: "private" | "public";
++    item: DesignItem;
++    visibility?: "private" | "public";
+ }
+ 
+ interface Generate3DViewParams {
+-  sourceImage: string;
+-  projectId?: string | null;
++    sourceImage: string;
++    projectId?: string | null;
+ }
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"AutoImportSettings\">\r\n    <option name=\"autoReloadType\" value=\"SELECTIVE\" />\r\n  </component>\r\n  <component name=\"ChangeListManager\">\r\n    <list default=\"true\" id=\"acb51500-a4f6-4185-aa15-ec080a06d120\" name=\"Changes\" comment=\"\">\r\n      <change beforePath=\"$PROJECT_DIR$/.idea/workspace.xml\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/.idea/workspace.xml\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/app/routes/home.tsx\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/app/routes/home.tsx\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/app/routes/visualizer.$id.tsx\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/app/routes/visualizer.$id.tsx\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/lib/puter.action.ts\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/lib/puter.action.ts\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/lib/puter.hosting.ts\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/lib/puter.hosting.ts\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/type.d.ts\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/type.d.ts\" afterDir=\"false\" />\r\n    </list>\r\n    <option name=\"SHOW_DIALOG\" value=\"false\" />\r\n    <option name=\"HIGHLIGHT_CONFLICTS\" value=\"true\" />\r\n    <option name=\"HIGHLIGHT_NON_ACTIVE_CHANGELIST\" value=\"false\" />\r\n    <option name=\"LAST_RESOLUTION\" value=\"IGNORE\" />\r\n  </component>\r\n  <component name=\"EmbeddingIndexingInfo\">\r\n    <option name=\"cachedIndexableFilesCount\" value=\"39\" />\r\n  </component>\r\n  <component name=\"Git.Settings\">\r\n    <option name=\"RECENT_GIT_ROOT_PATH\" value=\"$PROJECT_DIR$\" />\r\n  </component>\r\n  <component name=\"GitHubPullRequestSearchHistory\">{\r\n  &quot;lastFilter&quot;: {\r\n    &quot;state&quot;: &quot;OPEN&quot;,\r\n    &quot;assignee&quot;: &quot;hacki2005&quot;\r\n  }\r\n}</component>\r\n  <component name=\"GithubPullRequestsUISettings\">{\r\n  &quot;selectedUrlAndAccountId&quot;: {\r\n    &quot;url&quot;: &quot;https://github.com/hacki2005/roomify.git&quot;,\r\n    &quot;accountId&quot;: &quot;f4db48fd-b362-4a0c-8fab-88da2dfa073a&quot;\r\n  }\r\n}</component>\r\n  <component name=\"McpProjectServerCommands\">\r\n    <commands />\r\n    <urls />\r\n  </component>\r\n  <component name=\"NextEditCompletionFeaturesState\">\r\n    <decayedCancelled>\r\n      <entry key=\"MS100\" value=\"1.0011775467068325\" />\r\n      <entry key=\"MS500\" value=\"1.262062445867176\" />\r\n      <entry key=\"S2\" value=\"1.9379766184005467\" />\r\n      <entry key=\"S5\" value=\"2.4236994348566014\" />\r\n      <entry key=\"S10\" value=\"2.6763226346999014\" />\r\n      <entry key=\"S30\" value=\"2.8831257892897035\" />\r\n      <entry key=\"S60\" value=\"2.9798131672582486\" />\r\n      <entry key=\"M2\" value=\"3.4965030198139373\" />\r\n      <entry key=\"M5\" value=\"5.9108413813586145\" />\r\n      <entry key=\"M10\" value=\"13.509943773661071\" />\r\n      <entry key=\"M15\" value=\"23.95761192337484\" />\r\n      <entry key=\"M30\" value=\"56.52012459054305\" />\r\n      <entry key=\"H1\" value=\"135.8904369087071\" />\r\n      <entry key=\"H2\" value=\"326.89535286951076\" />\r\n      <entry key=\"H4\" value=\"651.8642041220363\" />\r\n      <entry key=\"D1\" value=\"1430.1534715551438\" />\r\n      <entry key=\"W1\" value=\"1675.0684139117643\" />\r\n    </decayedCancelled>\r\n    <decayedSelected>\r\n      <entry key=\"MS100\" value=\"0.0\" />\r\n      <entry key=\"MS500\" value=\"0.0\" />\r\n      <entry key=\"S2\" value=\"0.0\" />\r\n      <entry key=\"S5\" value=\"3.4129188039934954E-138\" />\r\n      <entry key=\"S10\" value=\"1.90655662758071E-69\" />\r\n      <entry key=\"S30\" value=\"1.633684343639299E-23\" />\r\n      <entry key=\"S60\" value=\"6.220169435110482E-12\" />\r\n      <entry key=\"M2\" value=\"5.08684361234215E-6\" />\r\n      <entry key=\"M5\" value=\"0.023686429857969128\" />\r\n      <entry key=\"M10\" value=\"0.4433498521048832\" />\r\n      <entry key=\"M15\" value=\"1.3018680763667212\" />\r\n      <entry key=\"M30\" value=\"6.791533966560046\" />\r\n      <entry key=\"H1\" value=\"28.931350270927\" />\r\n      <entry key=\"H2\" value=\"79.7874194136552\" />\r\n      <entry key=\"H4\" value=\"157.93836746255988\" />\r\n      <entry key=\"D1\" value=\"333.23902920410524\" />\r\n      <entry key=\"W1\" value=\"386.9705770693199\" />\r\n    </decayedSelected>\r\n    <decayedShown>\r\n      <entry key=\"MS100\" value=\"0.026660969183064834\" />\r\n      <entry key=\"MS500\" value=\"0.5943934399187998\" />\r\n      <entry key=\"S2\" value=\"1.495069326348728\" />\r\n      <entry key=\"S5\" value=\"2.1049058707093673\" />\r\n      <entry key=\"S10\" value=\"2.4705616776544725\" />\r\n      <entry key=\"S30\" value=\"2.8004881195776297\" />\r\n      <entry key=\"S60\" value=\"2.9364060575871416\" />\r\n      <entry key=\"M2\" value=\"3.4740553257393203\" />\r\n      <entry key=\"M5\" value=\"5.924749237250758\" />\r\n      <entry key=\"M10\" value=\"13.945326848830243\" />\r\n      <entry key=\"M15\" value=\"25.250243801442135\" />\r\n      <entry key=\"M30\" value=\"63.29604953827304\" />\r\n      <entry key=\"H1\" value=\"164.79340805526869\" />\r\n      <entry key=\"H2\" value=\"406.64487680287306\" />\r\n      <entry key=\"H4\" value=\"809.7650198882961\" />\r\n      <entry key=\"D1\" value=\"1763.3791098416575\" />\r\n      <entry key=\"W1\" value=\"2062.0367610842472\" />\r\n    </decayedShown>\r\n  </component>\r\n  <component name=\"ProjectColorInfo\">{\r\n  &quot;associatedIndex&quot;: 7,\r\n  &quot;fromUser&quot;: false\r\n}</component>\r\n  <component name=\"ProjectId\" id=\"3IPrZkeh8Jf5xTbWRmR7fdmTM2U\" />\r\n  <component name=\"ProjectLevelVcsManager\">\r\n    <ConfirmationsSetting value=\"2\" id=\"Add\" />\r\n  </component>\r\n  <component name=\"ProjectViewState\">\r\n    <option name=\"hideEmptyMiddlePackages\" value=\"true\" />\r\n    <option name=\"showLibraryContents\" value=\"true\" />\r\n  </component>\r\n  <component name=\"PropertiesComponent\">{\r\n  &quot;keyToString&quot;: {\r\n    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,\r\n    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,\r\n    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,\r\n    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,\r\n    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,\r\n    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,\r\n    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,\r\n    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,\r\n    &quot;git-widget-placeholder&quot;: &quot;hosting-images&quot;,\r\n    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,\r\n    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,\r\n    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,\r\n    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,\r\n    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,\r\n    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,\r\n    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,\r\n    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,\r\n    &quot;ts.external.directory.path&quot;: &quot;C:\\\\Users\\\\haris\\\\OneDrive\\\\Documents\\\\roomify\\\\node_modules\\\\typescript\\\\lib&quot;,\r\n    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;\r\n  }\r\n}</component>\r\n  <component name=\"ReactDesignerToolWindowState\">\r\n    <option name=\"myId2Visible\">\r\n      <map>\r\n        <entry key=\"com.intellij.reactbuddy.reactComponents\" value=\"false\" />\r\n        <entry key=\"com.intellij.reactbuddy.reactInspector\" value=\"false\" />\r\n        <entry key=\"com.intellij.reactbuddy.storybook\" value=\"false\" />\r\n      </map>\r\n    </option>\r\n  </component>\r\n  <component name=\"RecentsManager\">\r\n    <key name=\"MoveFile.RECENT_KEYS\">\r\n      <recent name=\"C:\\Users\\haris\\OneDrive\\Documents\\roomify\" />\r\n    </key>\r\n  </component>\r\n  <component name=\"SharedIndexes\">\r\n    <attachedChunks>\r\n      <set>\r\n        <option value=\"bundled-js-predefined-d6986cc7102b-31caf2ab9e3c-JavaScript-WS-261.25134.101\" />\r\n      </set>\r\n    </attachedChunks>\r\n  </component>\r\n  <component name=\"TaskManager\">\r\n    <task active=\"true\" id=\"Default\" summary=\"Default task\">\r\n      <changelist id=\"acb51500-a4f6-4185-aa15-ec080a06d120\" name=\"Changes\" comment=\"\" />\r\n      <created>1787677102104</created>\r\n      <option name=\"number\" value=\"Default\" />\r\n      <option name=\"presentableId\" value=\"Default\" />\r\n      <updated>1787677102104</updated>\r\n      <workItem from=\"1787677103157\" duration=\"838000\" />\r\n      <workItem from=\"1787708885185\" duration=\"3521000\" />\r\n      <workItem from=\"1787712580111\" duration=\"21000\" />\r\n      <workItem from=\"1787712628526\" duration=\"8397000\" />\r\n      <workItem from=\"1787734776504\" duration=\"2098000\" />\r\n      <workItem from=\"1787744511896\" duration=\"9265000\" />\r\n      <workItem from=\"1787895022243\" duration=\"10784000\" />\r\n      <workItem from=\"1787921260703\" duration=\"3139000\" />\r\n      <workItem from=\"1788092656447\" duration=\"2674000\" />\r\n    </task>\r\n    <servers />\r\n  </component>\r\n  <component name=\"TypeScriptGeneratedFilesManager\">\r\n    <option name=\"version\" value=\"3\" />\r\n    <option name=\"exactExcludedFiles\">\r\n      <list>\r\n        <option value=\"$PROJECT_DIR$/components/ui/Button.jsx\" />\r\n      </list>\r\n    </option>\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+--- a/.idea/workspace.xml	(revision b301551c7af11996bb89697daeb5979ee66318a1)
++++ b/.idea/workspace.xml	(date 1788095785354)
+@@ -5,7 +5,6 @@
+   </component>
+   <component name="ChangeListManager">
+     <list default="true" id="acb51500-a4f6-4185-aa15-ec080a06d120" name="Changes" comment="">
+-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+       <change beforePath="$PROJECT_DIR$/app/routes/home.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/routes/home.tsx" afterDir="false" />
+       <change beforePath="$PROJECT_DIR$/app/routes/visualizer.$id.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/routes/visualizer.$id.tsx" afterDir="false" />
+       <change beforePath="$PROJECT_DIR$/lib/puter.action.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/puter.action.ts" afterDir="false" />
+@@ -41,61 +40,61 @@
+   </component>
+   <component name="NextEditCompletionFeaturesState">
+     <decayedCancelled>
+-      <entry key="MS100" value="1.0011775467068325" />
+-      <entry key="MS500" value="1.262062445867176" />
+-      <entry key="S2" value="1.9379766184005467" />
+-      <entry key="S5" value="2.4236994348566014" />
+-      <entry key="S10" value="2.6763226346999014" />
+-      <entry key="S30" value="2.8831257892897035" />
+-      <entry key="S60" value="2.9798131672582486" />
+-      <entry key="M2" value="3.4965030198139373" />
+-      <entry key="M5" value="5.9108413813586145" />
+-      <entry key="M10" value="13.509943773661071" />
+-      <entry key="M15" value="23.95761192337484" />
+-      <entry key="M30" value="56.52012459054305" />
+-      <entry key="H1" value="135.8904369087071" />
+-      <entry key="H2" value="326.89535286951076" />
+-      <entry key="H4" value="651.8642041220363" />
+-      <entry key="D1" value="1430.1534715551438" />
+-      <entry key="W1" value="1675.0684139117643" />
++      <entry key="MS100" value="1.4263176818617296" />
++      <entry key="MS500" value="1.9351505850320707" />
++      <entry key="S2" value="3.6070584565508383" />
++      <entry key="S5" value="5.29366587476108" />
++      <entry key="S10" value="7.610741928706476" />
++      <entry key="S30" value="24.562834562829735" />
++      <entry key="S60" value="49.073044815778296" />
++      <entry key="M2" value="80.6470111886463" />
++      <entry key="M5" value="121.72299108877077" />
++      <entry key="M10" value="147.38656833108698" />
++      <entry key="M15" value="163.35659125363304" />
++      <entry key="M30" value="201.12495696495338" />
++      <entry key="H1" value="280.9503514828732" />
++      <entry key="H2" value="469.59477589961193" />
++      <entry key="H4" value="795.4631011934032" />
++      <entry key="D1" value="1590.6117171776566" />
++      <entry key="W1" value="1843.4729015863074" />
+     </decayedCancelled>
+     <decayedSelected>
+       <entry key="MS100" value="0.0" />
+-      <entry key="MS500" value="0.0" />
+-      <entry key="S2" value="0.0" />
+-      <entry key="S5" value="3.4129188039934954E-138" />
+-      <entry key="S10" value="1.90655662758071E-69" />
+-      <entry key="S30" value="1.633684343639299E-23" />
+-      <entry key="S60" value="6.220169435110482E-12" />
+-      <entry key="M2" value="5.08684361234215E-6" />
+-      <entry key="M5" value="0.023686429857969128" />
+-      <entry key="M10" value="0.4433498521048832" />
+-      <entry key="M15" value="1.3018680763667212" />
+-      <entry key="M30" value="6.791533966560046" />
+-      <entry key="H1" value="28.931350270927" />
+-      <entry key="H2" value="79.7874194136552" />
+-      <entry key="H4" value="157.93836746255988" />
+-      <entry key="D1" value="333.23902920410524" />
+-      <entry key="W1" value="386.9705770693199" />
++      <entry key="MS500" value="3.3138947174882355E-243" />
++      <entry key="S2" value="2.46289945710104E-61" />
++      <entry key="S5" value="7.028208008942457E-25" />
++      <entry key="S10" value="1.190208071303766E-12" />
++      <entry key="S30" value="2.0445678792455307E-4" />
++      <entry key="S60" value="0.02447669615785022" />
++      <entry key="M2" value="0.2701431445055012" />
++      <entry key="M5" value="1.1480109846862485" />
++      <entry key="M10" value="2.025588657395183" />
++      <entry key="M15" value="2.87049277843599" />
++      <entry key="M30" value="7.516879413193398" />
++      <entry key="H1" value="27.49829589569941" />
++      <entry key="H2" value="76.64873551451632" />
++      <entry key="H4" value="154.80303942170858" />
++      <entry key="D1" value="334.05738968214246" />
++      <entry key="W1" value="389.60788039331493" />
+     </decayedSelected>
+     <decayedShown>
+-      <entry key="MS100" value="0.026660969183064834" />
+-      <entry key="MS500" value="0.5943934399187998" />
+-      <entry key="S2" value="1.495069326348728" />
+-      <entry key="S5" value="2.1049058707093673" />
+-      <entry key="S10" value="2.4705616776544725" />
+-      <entry key="S30" value="2.8004881195776297" />
+-      <entry key="S60" value="2.9364060575871416" />
+-      <entry key="M2" value="3.4740553257393203" />
+-      <entry key="M5" value="5.924749237250758" />
+-      <entry key="M10" value="13.945326848830243" />
+-      <entry key="M15" value="25.250243801442135" />
+-      <entry key="M30" value="63.29604953827304" />
+-      <entry key="H1" value="164.79340805526869" />
+-      <entry key="H2" value="406.64487680287306" />
+-      <entry key="H4" value="809.7650198882961" />
+-      <entry key="D1" value="1763.3791098416575" />
+-      <entry key="W1" value="2062.0367610842472" />
++      <entry key="MS100" value="1.3625851961650468" />
++      <entry key="MS500" value="1.9105543647338212" />
++      <entry key="S2" value="3.5767214426666403" />
++      <entry key="S5" value="5.273518698486287" />
++      <entry key="S10" value="7.5967172680086" />
++      <entry key="S30" value="24.55193412102363" />
++      <entry key="S60" value="49.08639604756353" />
++      <entry key="M2" value="80.90122844864389" />
++      <entry key="M5" value="122.85106863011494" />
++      <entry key="M10" value="149.39507492993258" />
++      <entry key="M15" value="166.21140520097487" />
++      <entry key="M30" value="208.62422000660885" />
++      <entry key="H1" value="308.42104818901163" />
++      <entry key="H2" value="546.206742333721" />
++      <entry key="H4" value="950.2291508557386" />
++      <entry key="D1" value="1924.655653828866" />
++      <entry key="W1" value="2233.078532768648" />
+     </decayedShown>
+   </component>
+   <component name="ProjectColorInfo">{
+@@ -110,29 +109,29 @@
+     <option name="hideEmptyMiddlePackages" value="true" />
+     <option name="showLibraryContents" value="true" />
+   </component>
+-  <component name="PropertiesComponent">{
+-  &quot;keyToString&quot;: {
+-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+-    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+-    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+-    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+-    &quot;git-widget-placeholder&quot;: &quot;hosting-images&quot;,
+-    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
+-    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+-    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+-    &quot;ts.external.directory.path&quot;: &quot;C:\\Users\\haris\\OneDrive\\Documents\\roomify\\node_modules\\typescript\\lib&quot;,
+-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
++  <component name="PropertiesComponent"><![CDATA[{
++  "keyToString": {
++    "ModuleVcsDetector.initialDetectionPerformed": "true",
++    "RunOnceActivity.MCP Project settings loaded": "true",
++    "RunOnceActivity.ShowReadmeOnStart": "true",
++    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
++    "RunOnceActivity.git.unshallow": "true",
++    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
++    "codeWithMe.voiceChat.enabledByDefault": "false",
++    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
++    "git-widget-placeholder": "Merging hosting-images",
++    "javascript.preferred.runtime.type.id": "node",
++    "junie.onboarding.icon.badge.shown": "true",
++    "node.js.detected.package.eslint": "true",
++    "node.js.detected.package.tslint": "true",
++    "node.js.selected.package.eslint": "(autodetect)",
++    "node.js.selected.package.tslint": "(autodetect)",
++    "nodejs_package_manager_path": "npm",
++    "to.speed.mode.migration.done": "true",
++    "ts.external.directory.path": "C:\\Users\\haris\\OneDrive\\Documents\\roomify\\node_modules\\typescript\\lib",
++    "vue.rearranger.settings.migration": "true"
+   }
+-}</component>
++}]]></component>
+   <component name="ReactDesignerToolWindowState">
+     <option name="myId2Visible">
+       <map>
+@@ -169,7 +168,7 @@
+       <workItem from="1787744511896" duration="9265000" />
+       <workItem from="1787895022243" duration="10784000" />
+       <workItem from="1787921260703" duration="3139000" />
+-      <workItem from="1788092656447" duration="2674000" />
++      <workItem from="1788092656447" duration="3124000" />
+     </task>
+     <servers />
+   </component>
