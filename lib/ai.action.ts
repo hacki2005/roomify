@@ -1,6 +1,12 @@
 import puter from "@heyputer/puter.js";
 import { ROOMIFY_RENDER_PROMPT } from "./constants";
 
+/**
+ * Converts an image URL to a data URL.
+ *
+ * @param url - The image URL to fetch.
+ * @returns The fetched image encoded as a data URL.
+ */
 export async function fetchAsDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
 
