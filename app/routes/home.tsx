@@ -4,6 +4,11 @@ import {ArrowRight, ArrowUpRight, Clock, Layers} from "lucide-react";
 import {Button} from "../../components/ui/Button";
 
 
+/**
+ * Defines the page metadata for the home route.
+ *
+ * @returns The page title and description metadata
+ */
 export function meta({}: Route.MetaArgs) {
     return [
         {title: "New React Router App"},
